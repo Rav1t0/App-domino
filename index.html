@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dominó do Almoço</title>
+<style>
+:root{color-scheme:dark;--bg:#0a3524;--card:#11513a;--card2:#0d4230;--tx:#f3f7f4;--mut:#a5c4b4;--gold:#f5c542;--red:#e5484d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,sans-serif}
+#app{max-width:640px;margin:0 auto;padding:16px}
+h1{text-align:center;font-size:28px;margin:12px 0 4px}h2{margin:8px 0 12px;font-size:20px}
+.sub{text-align:center;color:var(--mut);margin-bottom:16px;text-transform:capitalize}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;border:1px solid #1d6b4d}
+.card.alt{background:var(--card2)}
+.btn{display:block;width:100%;padding:16px;margin:8px 0;border:0;border-radius:14px;font-size:17px;font-weight:700;background:#1d7a58;color:#fff;cursor:pointer}
+.btn.gold{background:var(--gold);color:#2a2100}.btn.ghost{background:transparent;border:1px solid #3b8a6b}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}
+.team{text-align:center;font-size:19px;font-weight:700;padding:10px}
+.vs{text-align:center;color:var(--mut);font-weight:700;margin:2px 0}
+.lbl{color:var(--mut);font-size:13px;text-transform:uppercase;letter-spacing:.05em;text-align:center}
+.win{color:var(--gold)}.lose{color:var(--red)}
+.bu{background:var(--red);color:#fff;border-radius:12px;text-align:center;font-weight:800;padding:10px;margin:8px 0;font-size:18px}
+.chk{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #1d6b4d;font-size:17px}
+.chk input{width:22px;height:22px}
+input[type=text],input[type=number],input[type=datetime-local],select{width:100%;padding:14px;border-radius:12px;border:1px solid #3b8a6b;background:#0a3524;color:#fff;font-size:18px}
+input[type=number]{text-align:center;font-size:28px;font-weight:700}
+.q{display:flex;gap:10px;padding:6px 0}.q b{color:var(--gold);min-width:28px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:14px;color:var(--mut)}.sum b{color:var(--tx)}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px}.tabs button{flex:none;padding:10px 12px;border-radius:20px;border:1px solid #3b8a6b;background:transparent;color:#fff;font-size:14px}
+.tabs button.on{background:var(--gold);color:#2a2100;border-color:var(--gold)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;text-align:center;white-space:nowrap}th{color:var(--mut);font-weight:600}td:first-child,th:first-child{text-align:left}tr+tr td{border-top:1px solid #1d6b4d}
+.toast{background:var(--red);padding:10px;border-radius:10px;margin-bottom:10px;text-align:center}
+.mut{color:var(--mut);text-align:center;padding:12px}
+.x{background:none;border:0;color:var(--red);font-size:20px;padding:6px 10px;cursor:pointer}.btn.red{background:var(--red)}.btn.sm{padding:10px;font-size:15px;margin:4px 0}select{font-size:16px;margin:4px 0}
+input[type=password],input[type=email]{width:100%;padding:14px;border-radius:12px;border:1px solid #3b8a6b;background:#0a3524;color:#fff;font-size:18px}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 16px;color:var(--mut);font-size:13px;max-width:640px;margin:0 auto}.bar button{background:none;border:1px solid #3b8a6b;color:#fff;border-radius:10px;padding:6px 10px}
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script></head><body><div class="bar" id="bar"></div><div id="app"></div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const S={view:'home',players:[],
+active:false,queue:[],A:null,B:null,waited:{},matches:[],last:null,tab:'ind',err:'',first:true,log:[],nid:1,f:null,user:null,admin:false,ro:false,loaded:false,st:'',bad:false};
+const db=supabase.createClient('https://pxovhmqnzvpfmtrpunsx.supabase.co','sb_publishable_S7C1GZpgZoa2AQsizioBMQ_y0O6dGl8');
+let sig0='',tm;
+const msg=(t,bad)=>{S.st=t;S.bad=!!bad;const e=document.getElementById('stt');if(e){e.textContent=t;e.className=bad?'lose':''}};
+const sigNow=()=>{S.matches.forEach(m=>{if(!m.db)m.db=crypto.randomUUID()});return JSON.stringify([S.players.map(p=>p.n),S.matches.map(m=>[m.db,m.t,m.A,m.B,m.sa,m.sb])])};
+function save(){if(!S.admin||!S.loaded)return;const sg=sigNow();if(sg===sig0)return;sig0=sg;clearTimeout(tm);msg('Salvando…');tm=setTimeout(sync,400)}
+async function sync(){try{
+  const rows=S.matches.map(m=>({id:m.db,jogou_em:new Date(m.t).toISOString(),a1:m.A[0],a2:m.A[1],b1:m.B[0],b2:m.B[1],placar_a:m.sa,placar_b:m.sb}));
+  const names=S.players.map(p=>({nome:p.n}));let r;
+  if(rows.length){r=await db.from('partidas').upsert(rows);if(r.error)throw r.error}
+  r=await (rows.length?db.from('partidas').delete().not('id','in','('+rows.map(x=>x.id).join(',')+')'):db.from('partidas').delete().not('id','is',null));if(r.error)throw r.error;
+  if(names.length){r=await db.from('jogadores').upsert(names,{onConflict:'nome'});if(r.error)throw r.error}
+  r=await (names.length?db.from('jogadores').delete().not('nome','in','('+names.map(x=>'"'+x.nome.replace(/"/g,'\\"')+'"').join(',')+')'):db.from('jogadores').delete().not('nome','is',null));if(r.error)throw r.error;
+  await loadLog();msg('Salvo ✓')}catch(e){sig0='';msg('Erro ao salvar: '+(e.message||e),true)}}
+async function loadLog(){const r=await db.from('exclusoes').select('*').order('excluida_em');if(r.error)return;
+  S.log=r.data.map(x=>{const p=x.partida;return{at:new Date(x.excluida_em).getTime(),m:{t:new Date(p.jogou_em).getTime(),A:[p.a1,p.a2],B:[p.b1,p.b2],sa:p.placar_a,sb:p.placar_b,bu:p.placar_a===0||p.placar_b===0}}})}
+function loginView(){$('bar').innerHTML='';$('app').innerHTML=`<h1>🏆 DOMINÓ DO ALMOÇO</h1><div class="sub">Acesso restrito</div>${S.err?`<div class="toast">${esc(S.err)}</div>`:''}<div class="card"><input type="email" id="em" placeholder="E-mail" autocomplete="username" style="margin-bottom:10px"><input type="password" id="pw" placeholder="Senha" autocomplete="current-password"></div><button class="btn gold" onclick="login()">ENTRAR</button>`}
+async function login(){const r=await db.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});
+  if(r.error){S.err='E-mail ou senha incorretos.';return render()}S.err='';await boot()}
+async function logout(){await db.auth.signOut();location.reload()}
+async function boot(){
+  const {data:{session}}=await db.auth.getSession();if(!session){S.user=null;return render()}
+  const r=await db.from('membros').select('papel').eq('user_id',session.user.id).maybeSingle();
+  if(r.error||!r.data){await db.auth.signOut();S.user=null;S.err='Esta conta não tem permissão de acesso.';return render()}
+  const [pj,pt]=await Promise.all([db.from('jogadores').select('nome').order('nome'),db.from('partidas').select('*').order('jogou_em')]);
+  if(pj.error||pt.error){S.user=null;S.err='Erro ao carregar os dados.';return render()}
+  S.admin=r.data.papel==='admin';S.ro=!S.admin;
+  S.players=pj.data.map(x=>({n:x.nome,on:true}));
+  S.matches=pt.data.map(x=>{const t=new Date(x.jogou_em).getTime();return{id:S.nid++,db:x.id,t,day:new Date(t).toDateString(),A:[x.a1,x.a2],B:[x.b1,x.b2],sa:x.placar_a,sb:x.placar_b,w:x.placar_a>x.placar_b?'A':'B',bu:x.placar_a===0||x.placar_b===0}});
+  if(S.admin)await loadLog();
+  S.user=session.user.email;S.loaded=true;sig0=sigNow();S.view='home';render()}
+function post(){
+  $('bar').innerHTML=`<span>👤 ${esc(S.user)}${S.admin?'':' (leitura)'}</span><span id="stt" class="${S.bad?'lose':''}">${esc(S.st||'')}</span><button onclick="logout()">Sair</button>`;
+  if(S.ro)document.querySelectorAll('#app button,#app label.btn').forEach(b=>{const o=b.getAttribute('onclick')||'';if(!/go\('(rank|hist|home)'\)|S\.tab=/.test(o))b.remove()})}
+const today=()=>new Date().toDateString();
+const nm=t=>t.map(esc).join(' + ');
+const cf=(msg,fn)=>{S.cf={msg,fn};render();scrollTo(0,0)};
+const go=(v,e)=>{S.cf=null;S.view=v;if(['draw','match','next'].includes(v))S.resume=v;S.err=e||'';render()};
+
+function startSession(){
+  const p=S.players.filter(x=>x.on).map(x=>x.n);
+  if(p.length<4)return go('setup','Selecione pelo menos 4 participantes.');
+  S.active=true;S.present=p;S.waited={};p.forEach(n=>S.waited[n]=0);S.last=null;S.first=true;
+  S.sessionStart=S.matches.length;drawFirst();go('draw');
+}
+function drawFirst(){const p=shuf(S.present);S.A=[p[0],p[1]];S.B=[p[2],p[3]];S.queue=p.slice(4);render()}
+function addPlayer(){const v=$('newp').value.trim();if(!v)return;
+  if(S.players.some(x=>x.n.toLowerCase()==v.toLowerCase()))return go('setup','Esse nome já existe.');
+  S.players.push({n:v,on:true});go(S.view)}
+function toggle(i){S.players[i].on=!S.players[i].on;const y=scrollY;render();scrollTo(0,y)}
+function prev(){const a=$('sa').value,b=$('sb').value;let h='';
+  if(a!==''&&b!==''&&a!==b&&(+a===0||+b===0))h='<div class="bu">🔥 BUCHUDA 🔥</div>';$('bupv').innerHTML=h}
+function register(){
+  const a=$('sa').value,b=$('sb').value;
+  if(a===''||b==='')return go('match','Informe a pontuação das duas duplas.');
+  const sa=+a,sb=+b;
+  if(sa<0||sb<0||!Number.isInteger(sa)||!Number.isInteger(sb))return go('match','Use números inteiros, sem negativos.');
+  if(sa===sb)return go('match','Empate não é permitido.');
+  const m={id:S.nid++,t:Date.now(),A:S.A.slice(),B:S.B.slice(),sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
+  S.matches.push(m);S.last=m;
+  S.queue.forEach(n=>S.waited[n]=(S.waited[n]||0)+1);[...S.A,...S.B].forEach(n=>S.waited[n]=0);
+  S.first=false;go('next');
+}
+function keepWinners(){
+  const m=S.last,W=m.w==='A'?m.A:m.B,L=m.w==='A'?m.B:m.A;
+  const on=S.players.filter(p=>p.on).map(p=>p.n);
+  if(on.length<4)return go('roster','Selecione pelo menos 4 jogadores.');
+  if(W.some(n=>!on.includes(n)))return go('roster','A dupla vencedora precisa continuar na sessão.');
+  const news=on.filter(n=>!S.present.includes(n));news.forEach(n=>S.waited[n]=0);
+  const comb=S.queue.filter(n=>on.includes(n)).concat(shuf(news),shuf(L.filter(n=>on.includes(n))));
+  S.present=on;S.A=W.slice();S.B=comb.slice(0,2);S.queue=comb.slice(2);go('match');
+}
+function openRoster(m){S.rmode=m||'draw';S.players.forEach(p=>p.on=S.present.includes(p.n));go('roster')}
+function drawAll(){
+  const on=S.players.filter(p=>p.on).map(p=>p.n);if(on.length<4)return go('roster','Selecione pelo menos 4 jogadores.');
+  const m=S.last;S.queue=S.queue.filter(n=>on.includes(n));on.forEach(n=>{if(!S.present.includes(n)){S.queue.push(n);S.waited[n]=0}});S.present=on;
+  const played=shuf([...m.A,...m.B].filter(n=>on.includes(n)));
+  const waiting=S.queue.map((n,i)=>({n,i})).sort((x,y)=>(S.waited[y.n]-S.waited[x.n])||(x.i-y.i)).map(x=>x.n);
+  const all=waiting.concat(played),four=shuf(all.slice(0,4));
+  S.A=[four[0],four[1]];S.B=[four[2],four[3]];S.queue=all.slice(4);go('match');
+}
+
+function summary(){
+  const hoje=S.matches.filter(m=>new Date(m.t).toDateString()===today()).length,l=S.last;
+  let h='<div class="card alt"><div class="sum">';
+  h+=`<div>Partidas hoje: <b>${hoje}</b></div><div>Presentes: <b>${S.present.length}</b></div>`;
+  h+=`<div style="grid-column:1/3">Jogando: <b>${S.A?nm(S.A)+' × '+nm(S.B):'—'}</b></div>`;
+  h+=`<div style="grid-column:1/3">Aguardando: <b>${S.queue.length?S.queue.map(esc).join(', '):'—'}</b></div>`;
+  if(l){const w=l.w==='A'?l.A:l.B;h+=`<div style="grid-column:1/3">Última dupla vencedora: <b class="win">${nm(w)}</b></div><div style="grid-column:1/3">Último resultado: <b>${nm(l.A)} ${l.sa} × ${l.sb} ${nm(l.B)}${l.bu?' 🔥':''}</b></div>`}
+  return h+'</div></div>'}
+function queueCard(){
+  let h='<div class="card"><h2>👥 AGUARDANDO</h2>';
+  if(!S.queue.length)h+='<div class="mut">Ninguém aguardando</div>';
+  S.queue.forEach((n,i)=>h+=`<div class="q"><b>${i+1}º</b><span>${esc(n)}</span><span style="margin-left:auto;color:var(--mut);font-size:13px">${S.waited[n]?'esperou '+S.waited[n]+' partida(s)':''}</span><button class="x" title="Tirar da sessão" onclick="dropQ(${i})">✕</button></div>`);
+  return h+'</div>'}
+function teams(win){
+  const c=t=>win?(win===t?'win':'lose'):'';
+  return `<div class="card"><div class="lbl">Dupla A</div><div class="team ${c('A')}">${nm(S.A)}</div><div class="vs">VS</div><div class="lbl">Dupla B</div><div class="team ${c('B')}">${nm(S.B)}</div></div>`}
+
+function stats(){
+  const P={},D={},ord=S.matches;
+  const get=(o,k)=>o[k]||(o[k]={j:0,v:0,d:0,ba:0,bs:0,cw:0,cl:0,mw:0,ml:0});
+  ord.forEach(m=>{
+    const W=m.w==='A'?m.A:m.B,L=m.w==='A'?m.B:m.A;
+    [[W,true],[L,false]].forEach(([t,won])=>{
+      const k=t.slice().sort((a,b)=>a.localeCompare(b)).join(' + ');
+      [...t.map(n=>get(P,n)),get(D,k)].forEach(s=>{s.j++;
+        if(won){s.v++;if(m.bu)s.ba++;s.cw++;s.cl=0;s.mw=Math.max(s.mw,s.cw)}
+        else{s.d++;if(m.bu)s.bs++;s.cl++;s.cw=0;s.ml=Math.max(s.ml,s.cl)}})})});
+  return{P,D}}
+function table(o,cols,sortf,label){
+  const r=Object.entries(o).sort(sortf);
+  if(!r.length)return '<div class="mut">Sem dados ainda. Registre partidas.</div>';
+  let h='<div class="tw"><table><tr><th>'+label+'</th>'+cols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr>';
+  r.forEach(([k,s],i)=>h+=`<tr><td>${i==0?'🥇 ':i==1?'🥈 ':i==2?'🥉 ':''}${esc(k)}</td>`+cols.map(c=>'<td>'+c[1](s)+'</td>').join('')+'</tr>');
+  return h+'</table></div>'}
+const pct=s=>s.j?Math.round(100*s.v/s.j)+'%':'0%';
+const byPct=(a,b)=>(b[1].v/b[1].j-a[1].v/a[1].j)||(b[1].v-a[1].v);
+const base=[['J',s=>s.j],['V',s=>s.v],['D',s=>s.d],['Aprov.',pct],['🔥 Apl.',s=>s.ba],['🔥 Sof.',s=>s.bs]];
+
+const cb=()=>S.active?'<button class="btn red sm" onclick="cancelSession()">✖ Cancelar sessão</button>':'';
+const iso=t=>new Date(t-new Date(t).getTimezoneOffset()*6e4).toISOString().slice(0,16);
+const fmt=t=>new Date(t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+function cancelSession(){cf('Cancelar a sessão? As partidas já registradas continuam no histórico.',()=>{S.active=false;S.A=S.B=null;S.queue=[];S.last=null;S.resume=null;go('home')})}
+function delPlayer(i){const n=S.players[i].n;cf('Remover '+n+' da lista de jogadores? O histórico é mantido.',()=>{S.players.splice(i,1);go(S.view)})}
+function dropQ(i){if(S.present.length<=4)return go(S.view,'Mínimo de 4 jogadores na sessão.');const n=S.queue[i];cf('Tirar '+n+' da sessão?',()=>{S.queue.splice(i,1);S.present=S.present.filter(x=>x!==n);render()})}
+function openForm(id){const m=id?S.matches.find(x=>x.id===id):null;S.f={id:id||null,p:m?[...m.A,...m.B]:['','','',''],sa:m?m.sa:'',sb:m?m.sb:'',dt:iso(m?m.t:Date.now())};go('form')}
+function saveForm(){
+  const f=S.f;f.p=[0,1,2,3].map(i=>$('p'+i).value);f.sa=$('fa').value;f.sb=$('fb').value;f.dt=$('fd').value;
+  const e=msg=>go('form',msg);
+  if(f.p.some(x=>!x))return e('Escolha os 4 jogadores.');
+  if(new Set(f.p).size<4)return e('Um jogador não pode aparecer duas vezes.');
+  const sa=+f.sa,sb=+f.sb;
+  if(f.sa===''||f.sb===''||sa<0||sb<0||!Number.isInteger(sa)||!Number.isInteger(sb))return e('Informe placares inteiros válidos.');
+  if(sa===sb)return e('Empate não é permitido.');
+  const t=f.dt?new Date(f.dt).getTime():Date.now();
+  const m={id:f.id||S.nid++,t,A:[f.p[0],f.p[1]],B:[f.p[2],f.p[3]],sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
+  const i=S.matches.findIndex(x=>x.id===m.id);
+  if(i>=0){S.matches[i]=m;if(S.last&&S.last.id===m.id)S.last=m}else S.matches.push(m);
+  S.matches.sort((a,b)=>a.t-b.t);S.f=null;go('hist');
+}
+function delMatch(id){const m=S.matches.find(x=>x.id===id);if(!m)return;cf('Excluir esta partida? Ela ficará no log de exclusões.',()=>{
+  S.log.push({at:Date.now(),m});S.matches=S.matches.filter(x=>x.id!==id);if(S.last&&S.last.id===id)S.last=null;render()})}
+function impCsv(f){const r=new FileReader();r.onload=()=>{try{
+ const rows=String(r.result).replace(/^\ufeff/,'').split(/\r?\n/).filter(x=>x.trim()).map(l=>l.split(';').map(c=>c.trim()));
+ const h=rows.shift().map(x=>x.toLowerCase());
+ const [iD,iH,iA,iB,iSa,iSb]=['data','hora','dupla a','dupla b','placar a','placar b'].map(k=>h.indexOf(k));
+ if([iD,iH,iA,iB,iSa,iSb].some(i=>i<0))throw 0;
+ const sig=m=>[m.t,...m.A,...m.B,m.sa,m.sb].join('|');const have=new Set(S.matches.map(sig));let n=0,bad=0;
+ rows.forEach(c=>{const dm=(c[iD]||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/),hm=(c[iH]||'').match(/^(\d{1,2}):(\d{2})$/);
+  const A=(c[iA]||'').split('+').map(x=>x.trim()),B=(c[iB]||'').split('+').map(x=>x.trim()),sa=+c[iSa],sb=+c[iSb];
+  if(!dm||!hm||A.length!==2||B.length!==2||new Set([...A,...B]).size<4||[...A,...B].some(x=>!x)||c[iSa]===''||c[iSb]===''||!Number.isInteger(sa)||!Number.isInteger(sb)||sa<0||sb<0||sa===sb)return bad++;
+  const m={id:S.nid++,t:new Date(+dm[3],dm[2]-1,+dm[1],+hm[1],+hm[2]).getTime(),A,B,sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
+  if(have.has(sig(m)))return;have.add(sig(m));S.matches.push(m);n++});
+ S.matches.sort((a,b)=>a.t-b.t);
+ S.matches.flatMap(m=>[...m.A,...m.B]).forEach(x=>{if(!S.players.some(p=>p.n===x))S.players.push({n:x,on:false})});
+ go('cfg',n+' partida(s) importada(s)'+(bad?', '+bad+' linha(s) ignorada(s)':'')+'.')}catch(e){go('cfg','Planilha inválida: use o CSV exportado pelo app.')}};r.readAsText(f)}
+function imp(ev){const f=ev.target.files[0];if(!f)return;if(/\.csv$/i.test(f.name))return impCsv(f);const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.partidas))throw 0;
+  const sig=m=>[m.t,...m.A,...m.B,m.sa,m.sb].join('|');const have=new Set(S.matches.map(sig));let n=0;
+  d.partidas.forEach(m=>{if(!m||!Array.isArray(m.A)||!Array.isArray(m.B)||m.A.length!==2||m.B.length!==2||!Number.isInteger(m.sa)||!Number.isInteger(m.sb)||m.sa===m.sb||typeof m.t!=='number'||have.has(sig(m)))return;
+   have.add(sig(m));S.matches.push({id:S.nid++,t:m.t,A:m.A.map(String),B:m.B.map(String),sa:m.sa,sb:m.sb,w:m.sa>m.sb?'A':'B',bu:m.sa===0||m.sb===0});n++});
+  S.matches.sort((a,b)=>a.t-b.t);
+  (d.jogadores||[]).concat(S.matches.flatMap(m=>[...m.A,...m.B])).forEach(x=>{x=String(x);if(!S.players.some(p=>p.n===x))S.players.push({n:x,on:false})});
+  (d.logExclusoes||[]).forEach(x=>{if(x&&x.m&&!S.log.some(y=>y.at===x.at))S.log.push(x)});
+  go('cfg',n+' partida(s) importada(s).')}catch(e){go('cfg','Arquivo de backup inválido.')}};r.readAsText(f)}
+async function exp(kind){
+  const d=window.claude&&await claude.use('downloads');if(!d)return go('cfg','Download indisponível neste ambiente.');
+  const day=new Date().toISOString().slice(0,10);let name,data,type;
+  if(kind==='bk'){name='domino-backup-'+day+'.json';type='application/json';data=JSON.stringify({exportadoEm:new Date().toISOString(),jogadores:S.players.map(p=>p.n),partidas:S.matches,logExclusoes:S.log},null,1)}
+  else{name='domino-rodadas-'+day+'.csv';type='text/csv';const r=['Rodada;Data;Hora;Dupla A;Dupla B;Placar A;Placar B;Vencedor;Buchuda'];
+    S.matches.forEach((m,i)=>{const t=new Date(m.t);r.push([i+1,t.toLocaleDateString('pt-BR'),t.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),m.A.join(' + '),m.B.join(' + '),m.sa,m.sb,(m.w==='A'?m.A:m.B).join(' + '),m.bu?'Sim':'Não'].join(';'))});
+    data='\ufeff'+r.join('\n')}
+  try{await d.save({filename:name,data:new Blob([data],{type})})}catch(e){if(!e||e.code!=='declined')go('cfg','Não foi possível salvar o arquivo.')}
+}
+function render(){
+  if(!S.user)return loginView();
+  if(S.ro&&!['home','rank','hist'].includes(S.view))S.view='home';
+  save();
+  const v=S.view;let h='';
+  if(S.err)h+=`<div class="toast">${esc(S.err)}</div>`;
+  if(S.cf)h+=`<div class="card"><b>${esc(S.cf.msg)}</b><div class="row"><button class="btn red" onclick="const f=S.cf.fn;S.cf=null;f()">Sim</button><button class="btn ghost" onclick="S.cf=null;render()">Não</button></div></div>`;
+  if(v==='home'){
+    h+=`<h1>🏆 DOMINÓ DO ALMOÇO</h1><div class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+<button class="btn gold" onclick="S.active?go(S.resume==='next'&&!S.last?'match':S.resume||'draw'):go('setup')">🎲 ${S.active?'Voltar à sessão':'Iniciar sessão / Sorteio'}</button>
+<button class="btn" onclick="openForm()">📝 Registrar partida</button>
+<button class="btn" onclick="go('rank')">🏆 Rankings</button>
+<button class="btn" onclick="go('hist')">📜 Histórico</button><button class="btn" onclick="go('setup')">👤 Jogadores</button><button class="btn" onclick="go('cfg')">⚙️ Configurações</button>`;
+    if(S.active)h+=summary()+queueCard()+cb();
+  }
+  if(v==='setup'||v==='roster'){
+    h+=`<h2>${v==='roster'?'👥 Quem joga a próxima rodada?':'📅 Sessão de hoje'}</h2><div class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><div class="card">`;
+    S.players.forEach((p,i)=>h+=`<div class="chk"><input type="checkbox" id="c${i}" ${p.on?'checked':''} onchange="toggle(${i})"><label for="c${i}" style="flex:1">${esc(p.n)}</label><button class="x" title="Remover" onclick="delPlayer(${i})">✕</button></div>`);
+    h+=`</div><div class="row"><input type="text" id="newp" placeholder="Novo participante" style="flex:3"><button class="btn" style="flex:1;margin:0" onclick="addPlayer()">＋</button></div>
+${v==='roster'?`<button class="btn gold" onclick="${S.rmode==='keep'?'keepWinners()':'drawAll()'}">${S.rmode==='keep'?'🏆 MANTER DUPLA':'🎲 SORTEAR AGORA'}</button><button class="btn ghost" onclick="go('next')">Voltar</button>`:`<button class="btn gold" onclick="startSession()">INICIAR SESSÃO</button><button class="btn ghost" onclick="go('home')">Voltar</button>`}`;
+  }
+  if(v==='draw'){
+    h+=`<h2>🎲 Sorteio da primeira partida</h2>`+teams()+queueCard()+
+`<button class="btn gold" onclick="go('match')">CONFIRMAR DUPLAS</button><button class="btn" onclick="drawFirst()">🎲 SORTEAR NOVAMENTE</button><button class="btn ghost" onclick="go('home')">Menu</button>${cb()}`;
+  }
+  if(v==='match'){
+    h+=summary().replace('','')+`<h2>📝 Registrar resultado</h2>`+`<div class="card"><div class="lbl">Dupla A</div><div class="team">${nm(S.A)}</div><input type="number" id="sa" min="0" step="1" inputmode="numeric" oninput="prev()" placeholder="0">
+<div class="vs">VS</div><div class="lbl">Dupla B</div><div class="team">${nm(S.B)}</div><input type="number" id="sb" min="0" step="1" inputmode="numeric" oninput="prev()" placeholder="0"></div><div id="bupv"></div>
+<button class="btn gold" onclick="register()">REGISTRAR RESULTADO</button><button class="btn ghost" onclick="go('home')">Menu</button>${cb()}`+queueCard();
+  }
+  if(v==='next'){
+    const m=S.last,w=m.w;
+    h+=`<h2>Resultado</h2><div class="card"><div class="team ${w==='A'?'win':'lose'}">${w==='A'?'🏆 ':''}${nm(m.A)} <span>${m.sa}</span></div><div class="team ${w==='B'?'win':'lose'}">${w==='B'?'🏆 ':''}${nm(m.B)} <span>${m.sb}</span></div>${m.bu?'<div class="bu">🔥 BUCHUDA 🔥</div>':''}</div>
+<h2>O que deseja fazer?</h2><button class="btn gold" onclick="openRoster('keep')">🏆 MANTER DUPLA VENCEDORA</button><button class="btn" onclick="openRoster()">🎲 SORTEAR TODAS AS DUPLAS</button>`+queueCard()+cb();
+  }
+  if(v==='rank'){
+    const {P,D}=stats(),T=[['ind','🏆 Individual'],['dup','🤝 Duplas'],['bu','🔥 Buchudas'],['sw','📈 Vitórias seguidas'],['sl','📉 Derrotas seguidas']];
+    h+=`<h2>Rankings</h2><div class="tabs">${T.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="S.tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div><div class="card">`;
+    if(S.tab==='ind')h+=table(P,base,byPct,'Jogador');
+    if(S.tab==='dup')h+=table(D,base,byPct,'Dupla');
+    if(S.tab==='bu')h+=table(P,[['Aplicadas',s=>s.ba],['Sofridas',s=>s.bs]],(a,b)=>(b[1].ba-a[1].ba)||(a[1].bs-b[1].bs),'Jogador');
+    if(S.tab==='sw')h+=table(P,[['Maior',s=>s.mw],['Atual',s=>s.cw]],(a,b)=>b[1].mw-a[1].mw,'Jogador');
+    if(S.tab==='sl')h+=table(P,[['Maior',s=>s.ml],['Atual',s=>s.cl]],(a,b)=>b[1].ml-a[1].ml,'Jogador');
+    h+=`</div><button class="btn ghost" onclick="go('home')">Voltar</button>`;
+  }
+  if(v==='hist'){
+    h+=`<h2>📜 Histórico</h2><button class="btn sm" onclick="openForm()">＋ Registrar partida</button>`;
+    if(!S.matches.length)h+='<div class="mut">Nenhuma partida registrada.</div>';
+    S.matches.slice().reverse().forEach(m=>{const W=m.w==='A'?m.A:m.B;
+      h+=`<div class="card"><div class="lbl">${new Date(m.t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</div>
+<div class="team ${m.w==='A'?'win':'lose'}" style="padding:4px">${nm(m.A)} — ${m.sa}</div><div class="team ${m.w==='B'?'win':'lose'}" style="padding:4px">${nm(m.B)} — ${m.sb}</div>
+<div class="lbl">Vencedor: <span class="win">${nm(W)}</span></div>${m.bu?'<div class="bu">🔥 BUCHUDA 🔥</div>':''}<div class="row"><button class="btn ghost sm" onclick="openForm(${m.id})">✏️ Editar</button><button class="btn ghost sm" onclick="delMatch(${m.id})">🗑 Excluir</button></div></div>`});
+    h+=`<button class="btn ghost" onclick="go('home')">Voltar</button>`;
+  }
+  if(v==='form'){const f=S.f,ids=[...new Set([...S.players.map(p=>p.n),...f.p.filter(Boolean)])];
+    const sel=i=>`<select id="p${i}"><option value="">Escolher jogador…</option>${ids.map(n=>`<option ${f.p[i]===n?'selected':''}>${esc(n)}</option>`).join('')}</select>`;
+    const num=(id,val)=>`<input type="number" id="${id}" min="0" step="1" inputmode="numeric" value="${val}" placeholder="Pontos">`;
+    h+=`<h2>${f.id?'✏️ Editar partida':'📝 Registrar partida'}</h2><div class="card"><div class="lbl">Data e hora</div><input type="datetime-local" id="fd" value="${f.dt}">
+<div class="lbl" style="margin-top:12px">Dupla A</div>${sel(0)}${sel(1)}${num('fa',f.sa)}<div class="vs">VS</div><div class="lbl">Dupla B</div>${sel(2)}${sel(3)}${num('fb',f.sb)}</div>
+<button class="btn gold" onclick="saveForm()">${f.id?'SALVAR ALTERAÇÕES':'REGISTRAR PARTIDA'}</button><button class="btn ghost" onclick="S.f=null;go('hist')">Cancelar</button>`}
+  if(v==='cfg')h+=`<h2>⚙️ Configurações</h2><div class="card"><button class="btn" onclick="exp('bk')">💾 Exportar backup (JSON)</button><button class="btn" onclick="exp('xl')">📊 Exportar planilha de rodadas (CSV)</button><label class="btn" style="text-align:center;cursor:pointer">📥 Importar backup (JSON) ou planilha (CSV)<input type="file" accept=".json,.csv,application/json,text/csv" onchange="imp(event)" hidden></label><button class="btn" onclick="go('log')">🗑 Log de exclusões (${S.log.length})</button><div class="mut">Os dados ficam só na memória desta página: exporte um backup antes de fechar.</div></div><button class="btn ghost" onclick="go('home')">Voltar</button>`;
+  if(v==='log'){h+=`<h2>🗑 Log de exclusões</h2>`;if(!S.log.length)h+='<div class="mut">Nenhuma partida excluída.</div>';
+    S.log.slice().reverse().forEach(x=>h+=`<div class="card"><div class="lbl">Excluída em ${fmt(x.at)} · partida de ${fmt(x.m.t)}</div><div class="team" style="padding:4px">${nm(x.m.A)} — ${x.m.sa}</div><div class="team" style="padding:4px">${nm(x.m.B)} — ${x.m.sb}</div></div>`);
+    h+=`<button class="btn ghost" onclick="go('cfg')">Voltar</button>`}
+  $('app').innerHTML=h;post();
+}
+boot();
+</script></body></html>
