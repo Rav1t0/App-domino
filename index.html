@@ -40,7 +40,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const S={view:'home',players:[],
-active:false,queue:[],A:null,B:null,waited:{},matches:[],last:null,tab:'ind',err:'',first:true,log:[],nid:1,f:null,user:null,admin:false,ro:false,loaded:false,st:'',bad:false};
+active:false,queue:[],A:null,B:null,waited:{},matches:[],last:null,tab:'pts',err:'',first:true,log:[],nid:1,f:null,user:null,admin:false,ro:false,loaded:false,st:'',bad:false};
 const db=supabase.createClient('https://pxovhmqnzvpfmtrpunsx.supabase.co','sb_publishable_S7C1GZpgZoa2AQsizioBMQ_y0O6dGl8');
 let sig0='',tm;
 const msg=(t,bad)=>{S.st=t;S.bad=!!bad;const e=document.getElementById('stt');if(e){e.textContent=t;e.className=bad?'lose':''}};
@@ -158,6 +158,14 @@ function table(o,cols,sortf,label){
   return h+'</table></div>'}
 const pct=s=>s.j?Math.round(100*s.v/s.j)+'%':'0%';
 const byPct=(a,b)=>(b[1].v/b[1].j-a[1].v/a[1].j)||(b[1].v-a[1].v);
+const pts=s=>3*s.v+s.d;
+function perfil(n){const r={j:0,v:0,d:0,ba:0,bs:0,par:{},opp:{}};
+ S.matches.forEach(m=>{const inA=m.A.includes(n),inB=m.B.includes(n);if(!inA&&!inB)return;
+  const my=inA?m.A:m.B,ot=inA?m.B:m.A,won=(m.w==='A')===inA,pa=my.find(x=>x!==n);
+  r.j++;won?r.v++:r.d++;if(m.bu){won?r.ba++:r.bs++}
+  const q=r.par[pa]||(r.par[pa]={j:0,v:0});q.j++;if(won)q.v++;
+  ot.forEach(o=>{const z=r.opp[o]||(r.opp[o]={v:0,d:0});won?z.v++:z.d++})});
+ return r}
 const base=[['J',s=>s.j],['V',s=>s.v],['D',s=>s.d],['Aprov.',pct],['🔥 Apl.',s=>s.ba],['🔥 Sof.',s=>s.bs]];
 
 const cb=()=>S.active?'<button class="btn red sm" onclick="cancelSession()">✖ Cancelar sessão</button>':'';
@@ -207,13 +215,14 @@ function imp(ev){const f=ev.target.files[0];if(!f)return;if(/\.csv$/i.test(f.nam
   (d.logExclusoes||[]).forEach(x=>{if(x&&x.m&&!S.log.some(y=>y.at===x.at))S.log.push(x)});
   go('cfg',n+' partida(s) importada(s).')}catch(e){go('cfg','Arquivo de backup inválido.')}};r.readAsText(f)}
 async function exp(kind){
-  const d=window.claude&&await claude.use('downloads');if(!d)return go('cfg','Download indisponível neste ambiente.');
+  const d=window.claude?await claude.use('downloads'):null;
   const day=new Date().toISOString().slice(0,10);let name,data,type;
   if(kind==='bk'){name='domino-backup-'+day+'.json';type='application/json';data=JSON.stringify({exportadoEm:new Date().toISOString(),jogadores:S.players.map(p=>p.n),partidas:S.matches,logExclusoes:S.log},null,1)}
   else{name='domino-rodadas-'+day+'.csv';type='text/csv';const r=['Rodada;Data;Hora;Dupla A;Dupla B;Placar A;Placar B;Vencedor;Buchuda'];
     S.matches.forEach((m,i)=>{const t=new Date(m.t);r.push([i+1,t.toLocaleDateString('pt-BR'),t.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),m.A.join(' + '),m.B.join(' + '),m.sa,m.sb,(m.w==='A'?m.A:m.B).join(' + '),m.bu?'Sim':'Não'].join(';'))});
     data='\ufeff'+r.join('\n')}
-  try{await d.save({filename:name,data:new Blob([data],{type})})}catch(e){if(!e||e.code!=='declined')go('cfg','Não foi possível salvar o arquivo.')}
+  const blob=new Blob([data],{type});
+  try{if(d)await d.save({filename:name,data:blob});else{const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)}}catch(e){if(!e||e.code!=='declined')go('cfg','Não foi possível salvar o arquivo.')}
 }
 function render(){
   if(!S.user)return loginView();
@@ -251,13 +260,29 @@ ${v==='roster'?`<button class="btn gold" onclick="${S.rmode==='keep'?'keepWinner
 <h2>O que deseja fazer?</h2><button class="btn gold" onclick="openRoster('keep')">🏆 MANTER DUPLA VENCEDORA</button><button class="btn" onclick="openRoster()">🎲 SORTEAR TODAS AS DUPLAS</button>`+queueCard()+cb();
   }
   if(v==='rank'){
-    const {P,D}=stats(),T=[['ind','🏆 Individual'],['dup','🤝 Duplas'],['bu','🔥 Buchudas'],['sw','📈 Vitórias seguidas'],['sl','📉 Derrotas seguidas']];
+    const {P,D}=stats(),T=[['pts','🏆 Pontos'],['ind','📊 Aproveitamento'],['dup','🤝 Duplas'],['bu','🔥 Buchudas'],['sw','📈 Vitórias seguidas'],['sl','📉 Derrotas seguidas'],['pf','👤 Perfil']];
     h+=`<h2>Rankings</h2><div class="tabs">${T.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="S.tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div><div class="card">`;
+    if(S.tab==='pts')h+=table(P,[['Pts',pts],...base],(a,b)=>(pts(b[1])-pts(a[1]))||(b[1].v-a[1].v)||byPct(a,b),'Jogador')+'<div class="mut">Vitória = 3 pts · derrota = 1 pt</div>';
     if(S.tab==='ind')h+=table(P,base,byPct,'Jogador');
     if(S.tab==='dup')h+=table(D,base,byPct,'Dupla');
     if(S.tab==='bu')h+=table(P,[['Aplicadas',s=>s.ba],['Sofridas',s=>s.bs]],(a,b)=>(b[1].ba-a[1].ba)||(a[1].bs-b[1].bs),'Jogador');
     if(S.tab==='sw')h+=table(P,[['Maior',s=>s.mw],['Atual',s=>s.cw]],(a,b)=>b[1].mw-a[1].mw,'Jogador');
     if(S.tab==='sl')h+=table(P,[['Maior',s=>s.ml],['Atual',s=>s.cl]],(a,b)=>b[1].ml-a[1].ml,'Jogador');
+    if(S.tab==='pf'){
+      const names=[...new Set(S.matches.flatMap(m=>[...m.A,...m.B]))].sort((a,b)=>a.localeCompare(b));
+      h+=`<select onchange="S.pf=this.value;render()"><option value="">Escolha um jogador…</option>${names.map(x=>`<option ${x===S.pf?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+      if(S.pf&&names.includes(S.pf)){
+        const r=perfil(S.pf),sp=P[S.pf]||{cw:0,cl:0,mw:0,ml:0},
+        best=Object.entries(r.par).sort((a,b)=>(3*b[1].v+b[1].j-b[1].v)-(3*a[1].v+a[1].j-a[1].v)||b[1].v-a[1].v)[0],
+        fr=Object.entries(r.opp).filter(e=>e[1].v>0).sort((a,b)=>b[1].v-a[1].v||a[1].d-b[1].d)[0];
+        h+=`<h2 style="margin-top:14px">👤 ${esc(S.pf)}</h2><div class="sum" style="font-size:15px">
+<div>Jogos: <b>${r.j}</b></div><div>Pontos: <b>${pts(r)}</b></div><div>Vitórias: <b>${r.v}</b></div><div>Derrotas: <b>${r.d}</b></div>
+<div>Aproveitamento: <b>${pct(r)}</b></div><div>🔥 Buchudas: <b>${r.ba} apl. · ${r.bs} sof.</b></div>
+<div style="grid-column:1/3">Sequência atual: <b>${sp.cw?'📈 '+sp.cw+' vitória(s) seguida(s)':sp.cl?'📉 '+sp.cl+' derrota(s) seguida(s)':'—'}</b></div>
+<div style="grid-column:1/3">Maiores sequências: <b>${sp.mw} vitória(s) · ${sp.ml} derrota(s)</b></div>
+<div style="grid-column:1/3">🤝 Melhor parceiro: <b>${best?esc(best[0])+' — '+best[1].v+' vitória(s) em '+best[1].j+' jogo(s)':'—'}</b></div>
+<div style="grid-column:1/3">😎 Maior freguês: <b>${fr?esc(fr[0])+' — venceu '+fr[1].v+'x e perdeu '+fr[1].d+'x contra ele':'—'}</b></div></div>`}
+    }
     h+=`</div><button class="btn ghost" onclick="go('home')">Voltar</button>`;
   }
   if(v==='hist'){
