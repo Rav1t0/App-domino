@@ -40,14 +40,14 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const S={view:'home',players:[],
-active:false,queue:[],A:null,B:null,waited:{},matches:[],last:null,tab:'pts',err:'',first:true,log:[],nid:1,f:null,user:null,admin:false,ro:false,loaded:false,st:'',bad:false};
+active:false,queue:[],A:null,B:null,waited:{},matches:[],last:null,tab:'pts',cat:'competitivo',err:'',first:true,log:[],nid:1,f:null,user:null,admin:false,ro:false,loaded:false,st:'',bad:false};
 const db=supabase.createClient('https://pxovhmqnzvpfmtrpunsx.supabase.co','sb_publishable_S7C1GZpgZoa2AQsizioBMQ_y0O6dGl8');
 let sig0='',tm;
 const msg=(t,bad)=>{S.st=t;S.bad=!!bad;const e=document.getElementById('stt');if(e){e.textContent=t;e.className=bad?'lose':''}};
-const sigNow=()=>{S.matches.forEach(m=>{if(!m.db)m.db=crypto.randomUUID()});return JSON.stringify([S.players.map(p=>p.n),S.matches.map(m=>[m.db,m.t,m.A,m.B,m.sa,m.sb])])};
+const sigNow=()=>{S.matches.forEach(m=>{if(!m.db)m.db=crypto.randomUUID()});return JSON.stringify([S.players.map(p=>p.n),S.matches.map(m=>[m.db,m.t,m.A,m.B,m.sa,m.sb,m.tipo])])};
 function save(){if(!S.admin||!S.loaded)return;const sg=sigNow();if(sg===sig0)return;sig0=sg;clearTimeout(tm);msg('Salvando…');tm=setTimeout(sync,400)}
 async function sync(){try{
-  const rows=S.matches.map(m=>({id:m.db,jogou_em:new Date(m.t).toISOString(),a1:m.A[0],a2:m.A[1],b1:m.B[0],b2:m.B[1],placar_a:m.sa,placar_b:m.sb}));
+  const rows=S.matches.map(m=>({id:m.db,jogou_em:new Date(m.t).toISOString(),a1:m.A[0],a2:m.A[1],b1:m.B[0],b2:m.B[1],placar_a:m.sa,placar_b:m.sb,tipo:m.tipo||'competitivo'}));
   const names=S.players.map(p=>({nome:p.n}));let r;
   if(rows.length){r=await db.from('partidas').upsert(rows);if(r.error)throw r.error}
   r=await (rows.length?db.from('partidas').delete().not('id','in','('+rows.map(x=>x.id).join(',')+')'):db.from('partidas').delete().not('id','is',null));if(r.error)throw r.error;
@@ -68,12 +68,12 @@ async function boot(){
   if(pj.error||pt.error){S.user=null;S.err='Erro ao carregar os dados.';return render()}
   S.admin=r.data.papel==='admin';S.ro=!S.admin;
   S.players=pj.data.map(x=>({n:x.nome,on:true}));
-  S.matches=pt.data.map(x=>{const t=new Date(x.jogou_em).getTime();return{id:S.nid++,db:x.id,t,day:new Date(t).toDateString(),A:[x.a1,x.a2],B:[x.b1,x.b2],sa:x.placar_a,sb:x.placar_b,w:x.placar_a>x.placar_b?'A':'B',bu:x.placar_a===0||x.placar_b===0}});
+  S.matches=pt.data.map(x=>{const t=new Date(x.jogou_em).getTime();return{id:S.nid++,db:x.id,t,day:new Date(t).toDateString(),A:[x.a1,x.a2],B:[x.b1,x.b2],sa:x.placar_a,sb:x.placar_b,tipo:x.tipo||'competitivo',w:x.placar_a>x.placar_b?'A':'B',bu:x.placar_a===0||x.placar_b===0}});
   if(S.admin)await loadLog();
   S.user=session.user.email;S.loaded=true;sig0=sigNow();S.view='home';render()}
 function post(){
   $('bar').innerHTML=`<span>👤 ${esc(S.user)}${S.admin?'':' (leitura)'}</span><span id="stt" class="${S.bad?'lose':''}">${esc(S.st||'')}</span><button onclick="logout()">Sair</button>`;
-  if(S.ro)document.querySelectorAll('#app button,#app label.btn').forEach(b=>{const o=b.getAttribute('onclick')||'';if(!/go\('(rank|hist|home)'\)|S\.tab=/.test(o))b.remove()})}
+  if(S.ro)document.querySelectorAll('#app button,#app label.btn').forEach(b=>{const o=b.getAttribute('onclick')||'';if(!/go\('(rank|hist|home|perfil)'\)|S\.tab=|S\.cat=/.test(o))b.remove()})}
 const today=()=>new Date().toDateString();
 const nm=t=>t.map(esc).join(' + ');
 const cf=(msg,fn)=>{S.cf={msg,fn};render();scrollTo(0,0)};
@@ -98,7 +98,7 @@ function register(){
   const sa=+a,sb=+b;
   if(sa<0||sb<0||!Number.isInteger(sa)||!Number.isInteger(sb))return go('match','Use números inteiros, sem negativos.');
   if(sa===sb)return go('match','Empate não é permitido.');
-  const m={id:S.nid++,t:Date.now(),A:S.A.slice(),B:S.B.slice(),sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
+  const m={id:S.nid++,tipo:$('tp').value,t:Date.now(),A:S.A.slice(),B:S.B.slice(),sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
   S.matches.push(m);S.last=m;
   S.queue.forEach(n=>S.waited[n]=(S.waited[n]||0)+1);[...S.A,...S.B].forEach(n=>S.waited[n]=0);
   S.first=false;go('next');
@@ -140,7 +140,7 @@ function teams(win){
   return `<div class="card"><div class="lbl">Dupla A</div><div class="team ${c('A')}">${nm(S.A)}</div><div class="vs">VS</div><div class="lbl">Dupla B</div><div class="team ${c('B')}">${nm(S.B)}</div></div>`}
 
 function stats(){
-  const P={},D={},ord=S.matches;
+  const P={},D={},ord=S.matches.filter(m=>(m.tipo||'competitivo')===S.cat);
   const get=(o,k)=>o[k]||(o[k]={j:0,v:0,d:0,ba:0,bs:0,cw:0,cl:0,mw:0,ml:0});
   ord.forEach(m=>{
     const W=m.w==='A'?m.A:m.B,L=m.w==='A'?m.B:m.A;
@@ -159,8 +159,10 @@ function table(o,cols,sortf,label){
 const pct=s=>s.j?Math.round(100*s.v/s.j)+'%':'0%';
 const byPct=(a,b)=>(b[1].v/b[1].j-a[1].v/a[1].j)||(b[1].v-a[1].v);
 const pts=s=>3*s.v+s.d;
+const catBar=()=>`<div class="tabs">${[['competitivo','🏅 Competitivo'],['amistoso','🤝 Amistoso']].map(c=>`<button class="${S.cat===c[0]?'on':''}" onclick="S.cat='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
+const tipoSel=v=>`<select id="tp" onchange="S.tipoSel=this.value"><option value="competitivo" ${v==='amistoso'?'':'selected'}>🏅 Competitivo</option><option value="amistoso" ${v==='amistoso'?'selected':''}>🤝 Amistoso</option></select>`;
 function perfil(n){const r={j:0,v:0,d:0,ba:0,bs:0,par:{},opp:{}};
- S.matches.forEach(m=>{const inA=m.A.includes(n),inB=m.B.includes(n);if(!inA&&!inB)return;
+ S.matches.filter(m=>(m.tipo||'competitivo')===S.cat).forEach(m=>{const inA=m.A.includes(n),inB=m.B.includes(n);if(!inA&&!inB)return;
   const my=inA?m.A:m.B,ot=inA?m.B:m.A,won=(m.w==='A')===inA,pa=my.find(x=>x!==n);
   r.j++;won?r.v++:r.d++;if(m.bu){won?r.ba++:r.bs++}
   const q=r.par[pa]||(r.par[pa]={j:0,v:0});q.j++;if(won)q.v++;
@@ -174,9 +176,9 @@ const fmt=t=>new Date(t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'sh
 function cancelSession(){cf('Cancelar a sessão? As partidas já registradas continuam no histórico.',()=>{S.active=false;S.A=S.B=null;S.queue=[];S.last=null;S.resume=null;go('home')})}
 function delPlayer(i){const n=S.players[i].n;cf('Remover '+n+' da lista de jogadores? O histórico é mantido.',()=>{S.players.splice(i,1);go(S.view)})}
 function dropQ(i){if(S.present.length<=4)return go(S.view,'Mínimo de 4 jogadores na sessão.');const n=S.queue[i];cf('Tirar '+n+' da sessão?',()=>{S.queue.splice(i,1);S.present=S.present.filter(x=>x!==n);render()})}
-function openForm(id){const m=id?S.matches.find(x=>x.id===id):null;S.f={id:id||null,p:m?[...m.A,...m.B]:['','','',''],sa:m?m.sa:'',sb:m?m.sb:'',dt:iso(m?m.t:Date.now())};go('form')}
+function openForm(id){const m=id?S.matches.find(x=>x.id===id):null;S.f={id:id||null,p:m?[...m.A,...m.B]:['','','',''],sa:m?m.sa:'',sb:m?m.sb:'',dt:iso(m?m.t:Date.now()),tipo:m?(m.tipo||'competitivo'):(S.tipoSel||'competitivo')};go('form')}
 function saveForm(){
-  const f=S.f;f.p=[0,1,2,3].map(i=>$('p'+i).value);f.sa=$('fa').value;f.sb=$('fb').value;f.dt=$('fd').value;
+  const f=S.f;f.p=[0,1,2,3].map(i=>$('p'+i).value);f.sa=$('fa').value;f.sb=$('fb').value;f.dt=$('fd').value;f.tipo=$('tp').value;
   const e=msg=>go('form',msg);
   if(f.p.some(x=>!x))return e('Escolha os 4 jogadores.');
   if(new Set(f.p).size<4)return e('Um jogador não pode aparecer duas vezes.');
@@ -184,7 +186,7 @@ function saveForm(){
   if(f.sa===''||f.sb===''||sa<0||sb<0||!Number.isInteger(sa)||!Number.isInteger(sb))return e('Informe placares inteiros válidos.');
   if(sa===sb)return e('Empate não é permitido.');
   const t=f.dt?new Date(f.dt).getTime():Date.now();
-  const m={id:f.id||S.nid++,t,A:[f.p[0],f.p[1]],B:[f.p[2],f.p[3]],sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
+  const m={id:f.id||S.nid++,tipo:f.tipo,db:(S.matches.find(x=>x.id===f.id)||{}).db,t,A:[f.p[0],f.p[1]],B:[f.p[2],f.p[3]],sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
   const i=S.matches.findIndex(x=>x.id===m.id);
   if(i>=0){S.matches[i]=m;if(S.last&&S.last.id===m.id)S.last=m}else S.matches.push(m);
   S.matches.sort((a,b)=>a.t-b.t);S.f=null;go('hist');
@@ -195,12 +197,12 @@ function impCsv(f){const r=new FileReader();r.onload=()=>{try{
  const rows=String(r.result).replace(/^\ufeff/,'').split(/\r?\n/).filter(x=>x.trim()).map(l=>l.split(';').map(c=>c.trim()));
  const h=rows.shift().map(x=>x.toLowerCase());
  const [iD,iH,iA,iB,iSa,iSb]=['data','hora','dupla a','dupla b','placar a','placar b'].map(k=>h.indexOf(k));
- if([iD,iH,iA,iB,iSa,iSb].some(i=>i<0))throw 0;
+ if([iD,iH,iA,iB,iSa,iSb].some(i=>i<0))throw 0;const iT=h.indexOf('tipo');
  const sig=m=>[m.t,...m.A,...m.B,m.sa,m.sb].join('|');const have=new Set(S.matches.map(sig));let n=0,bad=0;
  rows.forEach(c=>{const dm=(c[iD]||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/),hm=(c[iH]||'').match(/^(\d{1,2}):(\d{2})$/);
   const A=(c[iA]||'').split('+').map(x=>x.trim()),B=(c[iB]||'').split('+').map(x=>x.trim()),sa=+c[iSa],sb=+c[iSb];
   if(!dm||!hm||A.length!==2||B.length!==2||new Set([...A,...B]).size<4||[...A,...B].some(x=>!x)||c[iSa]===''||c[iSb]===''||!Number.isInteger(sa)||!Number.isInteger(sb)||sa<0||sb<0||sa===sb)return bad++;
-  const m={id:S.nid++,t:new Date(+dm[3],dm[2]-1,+dm[1],+hm[1],+hm[2]).getTime(),A,B,sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
+  const m={id:S.nid++,tipo:iT>=0&&/amist/i.test(c[iT]||'')?'amistoso':'competitivo',t:new Date(+dm[3],dm[2]-1,+dm[1],+hm[1],+hm[2]).getTime(),A,B,sa,sb,w:sa>sb?'A':'B',bu:sa===0||sb===0};
   if(have.has(sig(m)))return;have.add(sig(m));S.matches.push(m);n++});
  S.matches.sort((a,b)=>a.t-b.t);
  S.matches.flatMap(m=>[...m.A,...m.B]).forEach(x=>{if(!S.players.some(p=>p.n===x))S.players.push({n:x,on:false})});
@@ -209,7 +211,7 @@ function imp(ev){const f=ev.target.files[0];if(!f)return;if(/\.csv$/i.test(f.nam
  r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.partidas))throw 0;
   const sig=m=>[m.t,...m.A,...m.B,m.sa,m.sb].join('|');const have=new Set(S.matches.map(sig));let n=0;
   d.partidas.forEach(m=>{if(!m||!Array.isArray(m.A)||!Array.isArray(m.B)||m.A.length!==2||m.B.length!==2||!Number.isInteger(m.sa)||!Number.isInteger(m.sb)||m.sa===m.sb||typeof m.t!=='number'||have.has(sig(m)))return;
-   have.add(sig(m));S.matches.push({id:S.nid++,t:m.t,A:m.A.map(String),B:m.B.map(String),sa:m.sa,sb:m.sb,w:m.sa>m.sb?'A':'B',bu:m.sa===0||m.sb===0});n++});
+   have.add(sig(m));S.matches.push({id:S.nid++,t:m.t,A:m.A.map(String),B:m.B.map(String),sa:m.sa,sb:m.sb,w:m.sa>m.sb?'A':'B',bu:m.sa===0||m.sb===0,tipo:m.tipo==='amistoso'?'amistoso':'competitivo'});n++});
   S.matches.sort((a,b)=>a.t-b.t);
   (d.jogadores||[]).concat(S.matches.flatMap(m=>[...m.A,...m.B])).forEach(x=>{x=String(x);if(!S.players.some(p=>p.n===x))S.players.push({n:x,on:false})});
   (d.logExclusoes||[]).forEach(x=>{if(x&&x.m&&!S.log.some(y=>y.at===x.at))S.log.push(x)});
@@ -218,15 +220,15 @@ async function exp(kind){
   const d=window.claude?await claude.use('downloads'):null;
   const day=new Date().toISOString().slice(0,10);let name,data,type;
   if(kind==='bk'){name='domino-backup-'+day+'.json';type='application/json';data=JSON.stringify({exportadoEm:new Date().toISOString(),jogadores:S.players.map(p=>p.n),partidas:S.matches,logExclusoes:S.log},null,1)}
-  else{name='domino-rodadas-'+day+'.csv';type='text/csv';const r=['Rodada;Data;Hora;Dupla A;Dupla B;Placar A;Placar B;Vencedor;Buchuda'];
-    S.matches.forEach((m,i)=>{const t=new Date(m.t);r.push([i+1,t.toLocaleDateString('pt-BR'),t.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),m.A.join(' + '),m.B.join(' + '),m.sa,m.sb,(m.w==='A'?m.A:m.B).join(' + '),m.bu?'Sim':'Não'].join(';'))});
+  else{name='domino-rodadas-'+day+'.csv';type='text/csv';const r=['Rodada;Data;Hora;Dupla A;Dupla B;Placar A;Placar B;Vencedor;Buchuda;Tipo'];
+    S.matches.forEach((m,i)=>{const t=new Date(m.t);r.push([i+1,t.toLocaleDateString('pt-BR'),t.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),m.A.join(' + '),m.B.join(' + '),m.sa,m.sb,(m.w==='A'?m.A:m.B).join(' + '),m.bu?'Sim':'Não',m.tipo==='amistoso'?'Amistoso':'Competitivo'].join(';'))});
     data='\ufeff'+r.join('\n')}
   const blob=new Blob([data],{type});
   try{if(d)await d.save({filename:name,data:blob});else{const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)}}catch(e){if(!e||e.code!=='declined')go('cfg','Não foi possível salvar o arquivo.')}
 }
 function render(){
   if(!S.user)return loginView();
-  if(S.ro&&!['home','rank','hist'].includes(S.view))S.view='home';
+  if(S.ro&&!['home','rank','hist','perfil'].includes(S.view))S.view='home';
   save();
   const v=S.view;let h='';
   if(S.err)h+=`<div class="toast">${esc(S.err)}</div>`;
@@ -236,6 +238,7 @@ function render(){
 <button class="btn gold" onclick="S.active?go(S.resume==='next'&&!S.last?'match':S.resume||'draw'):go('setup')">🎲 ${S.active?'Voltar à sessão':'Iniciar sessão / Sorteio'}</button>
 <button class="btn" onclick="openForm()">📝 Registrar partida</button>
 <button class="btn" onclick="go('rank')">🏆 Rankings</button>
+<button class="btn" onclick="go('perfil')">👤 Perfil de jogadores</button>
 <button class="btn" onclick="go('hist')">📜 Histórico</button><button class="btn" onclick="go('setup')">👤 Jogadores</button><button class="btn" onclick="go('cfg')">⚙️ Configurações</button>`;
     if(S.active)h+=summary()+queueCard()+cb();
   }
@@ -251,7 +254,7 @@ ${v==='roster'?`<button class="btn gold" onclick="${S.rmode==='keep'?'keepWinner
   }
   if(v==='match'){
     h+=summary().replace('','')+`<h2>📝 Registrar resultado</h2>`+`<div class="card"><div class="lbl">Dupla A</div><div class="team">${nm(S.A)}</div><input type="number" id="sa" min="0" step="1" inputmode="numeric" oninput="prev()" placeholder="0">
-<div class="vs">VS</div><div class="lbl">Dupla B</div><div class="team">${nm(S.B)}</div><input type="number" id="sb" min="0" step="1" inputmode="numeric" oninput="prev()" placeholder="0"></div><div id="bupv"></div>
+<div class="vs">VS</div><div class="lbl">Dupla B</div><div class="team">${nm(S.B)}</div><input type="number" id="sb" min="0" step="1" inputmode="numeric" oninput="prev()" placeholder="0"></div><div id="bupv"></div><div class="card alt"><div class="lbl">Tipo da partida</div>${tipoSel(S.tipoSel)}</div>
 <button class="btn gold" onclick="register()">REGISTRAR RESULTADO</button><button class="btn ghost" onclick="go('home')">Menu</button>${cb()}`+queueCard();
   }
   if(v==='next'){
@@ -260,15 +263,26 @@ ${v==='roster'?`<button class="btn gold" onclick="${S.rmode==='keep'?'keepWinner
 <h2>O que deseja fazer?</h2><button class="btn gold" onclick="openRoster('keep')">🏆 MANTER DUPLA VENCEDORA</button><button class="btn" onclick="openRoster()">🎲 SORTEAR TODAS AS DUPLAS</button>`+queueCard()+cb();
   }
   if(v==='rank'){
-    const {P,D}=stats(),T=[['pts','🏆 Pontos'],['ind','📊 Aproveitamento'],['dup','🤝 Duplas'],['bu','🔥 Buchudas'],['sw','📈 Vitórias seguidas'],['sl','📉 Derrotas seguidas'],['pf','👤 Perfil']];
-    h+=`<h2>Rankings</h2><div class="tabs">${T.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="S.tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div><div class="card">`;
+    const {P,D}=stats(),T=[['pts','🏆 Pontos'],['ind','📊 Aproveitamento'],['dup','🤝 Duplas'],['bu','🔥 Buchudas'],['sw','📈 Vitórias seguidas'],['sl','📉 Derrotas seguidas']];
+    h+=`<h2>Rankings</h2>${catBar()}<div class="tabs">${T.map(t=>`<button class="${S.tab===t[0]?'on':''}" onclick="S.tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div><div class="card">`;
     if(S.tab==='pts')h+=table(P,[['Pts',pts],...base],(a,b)=>(pts(b[1])-pts(a[1]))||(b[1].v-a[1].v)||byPct(a,b),'Jogador')+'<div class="mut">Vitória = 3 pts · derrota = 1 pt</div>';
     if(S.tab==='ind')h+=table(P,base,byPct,'Jogador');
     if(S.tab==='dup')h+=table(D,base,byPct,'Dupla');
     if(S.tab==='bu')h+=table(P,[['Aplicadas',s=>s.ba],['Sofridas',s=>s.bs]],(a,b)=>(b[1].ba-a[1].ba)||(a[1].bs-b[1].bs),'Jogador');
     if(S.tab==='sw')h+=table(P,[['Maior',s=>s.mw],['Atual',s=>s.cw]],(a,b)=>b[1].mw-a[1].mw,'Jogador');
     if(S.tab==='sl')h+=table(P,[['Maior',s=>s.ml],['Atual',s=>s.cl]],(a,b)=>b[1].ml-a[1].ml,'Jogador');
-    if(S.tab==='pf'){
+h+=`</div><button class="btn ghost" onclick="go('home')">Voltar</button>`;
+  }
+  if(v==='hist'){
+    h+=`<h2>📜 Histórico</h2><button class="btn sm" onclick="openForm()">＋ Registrar partida</button>`;
+    if(!S.matches.length)h+='<div class="mut">Nenhuma partida registrada.</div>';
+    S.matches.slice().reverse().forEach(m=>{const W=m.w==='A'?m.A:m.B;
+      h+=`<div class="card"><div class="lbl">${new Date(m.t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</div>
+<div class="team ${m.w==='A'?'win':'lose'}" style="padding:4px">${nm(m.A)} — ${m.sa}</div><div class="team ${m.w==='B'?'win':'lose'}" style="padding:4px">${nm(m.B)} — ${m.sb}</div>
+<div class="lbl">${m.tipo==='amistoso'?'🤝 Amistoso':'🏅 Competitivo'} · Vencedor: <span class="win">${nm(W)}</span></div>${m.bu?'<div class="bu">🔥 BUCHUDA 🔥</div>':''}<div class="row"><button class="btn ghost sm" onclick="openForm(${m.id})">✏️ Editar</button><button class="btn ghost sm" onclick="delMatch(${m.id})">🗑 Excluir</button></div></div>`});
+    h+=`<button class="btn ghost" onclick="go('home')">Voltar</button>`;
+  }
+    if(v==='perfil'){const {P}=stats();h+=`<h2>👤 Perfil de jogadores</h2>${catBar()}<div class="card">`;
       const names=[...new Set(S.matches.flatMap(m=>[...m.A,...m.B]))].sort((a,b)=>a.localeCompare(b));
       h+=`<select onchange="S.pf=this.value;render()"><option value="">Escolha um jogador…</option>${names.map(x=>`<option ${x===S.pf?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
       if(S.pf&&names.includes(S.pf)){
@@ -282,22 +296,11 @@ ${v==='roster'?`<button class="btn gold" onclick="${S.rmode==='keep'?'keepWinner
 <div style="grid-column:1/3">Maiores sequências: <b>${sp.mw} vitória(s) · ${sp.ml} derrota(s)</b></div>
 <div style="grid-column:1/3">🤝 Melhor parceiro: <b>${best?esc(best[0])+' — '+best[1].v+' vitória(s) em '+best[1].j+' jogo(s)':'—'}</b></div>
 <div style="grid-column:1/3">😎 Maior freguês: <b>${fr?esc(fr[0])+' — venceu '+fr[1].v+'x e perdeu '+fr[1].d+'x contra ele':'—'}</b></div></div>`}
-    }
-    h+=`</div><button class="btn ghost" onclick="go('home')">Voltar</button>`;
-  }
-  if(v==='hist'){
-    h+=`<h2>📜 Histórico</h2><button class="btn sm" onclick="openForm()">＋ Registrar partida</button>`;
-    if(!S.matches.length)h+='<div class="mut">Nenhuma partida registrada.</div>';
-    S.matches.slice().reverse().forEach(m=>{const W=m.w==='A'?m.A:m.B;
-      h+=`<div class="card"><div class="lbl">${new Date(m.t).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</div>
-<div class="team ${m.w==='A'?'win':'lose'}" style="padding:4px">${nm(m.A)} — ${m.sa}</div><div class="team ${m.w==='B'?'win':'lose'}" style="padding:4px">${nm(m.B)} — ${m.sb}</div>
-<div class="lbl">Vencedor: <span class="win">${nm(W)}</span></div>${m.bu?'<div class="bu">🔥 BUCHUDA 🔥</div>':''}<div class="row"><button class="btn ghost sm" onclick="openForm(${m.id})">✏️ Editar</button><button class="btn ghost sm" onclick="delMatch(${m.id})">🗑 Excluir</button></div></div>`});
-    h+=`<button class="btn ghost" onclick="go('home')">Voltar</button>`;
-  }
+    h+=`</div><button class="btn ghost" onclick="go('home')">Voltar</button>`;}
   if(v==='form'){const f=S.f,ids=[...new Set([...S.players.map(p=>p.n),...f.p.filter(Boolean)])];
     const sel=i=>`<select id="p${i}"><option value="">Escolher jogador…</option>${ids.map(n=>`<option ${f.p[i]===n?'selected':''}>${esc(n)}</option>`).join('')}</select>`;
     const num=(id,val)=>`<input type="number" id="${id}" min="0" step="1" inputmode="numeric" value="${val}" placeholder="Pontos">`;
-    h+=`<h2>${f.id?'✏️ Editar partida':'📝 Registrar partida'}</h2><div class="card"><div class="lbl">Data e hora</div><input type="datetime-local" id="fd" value="${f.dt}">
+    h+=`<h2>${f.id?'✏️ Editar partida':'📝 Registrar partida'}</h2><div class="card"><div class="lbl">Data e hora</div><input type="datetime-local" id="fd" value="${f.dt}"><div class="lbl" style="margin-top:12px">Tipo da partida</div>${tipoSel(f.tipo)}
 <div class="lbl" style="margin-top:12px">Dupla A</div>${sel(0)}${sel(1)}${num('fa',f.sa)}<div class="vs">VS</div><div class="lbl">Dupla B</div>${sel(2)}${sel(3)}${num('fb',f.sb)}</div>
 <button class="btn gold" onclick="saveForm()">${f.id?'SALVAR ALTERAÇÕES':'REGISTRAR PARTIDA'}</button><button class="btn ghost" onclick="S.f=null;go('hist')">Cancelar</button>`}
   if(v==='cfg')h+=`<h2>⚙️ Configurações</h2><div class="card"><button class="btn" onclick="exp('bk')">💾 Exportar backup (JSON)</button><button class="btn" onclick="exp('xl')">📊 Exportar planilha de rodadas (CSV)</button><label class="btn" style="text-align:center;cursor:pointer">📥 Importar backup (JSON) ou planilha (CSV)<input type="file" accept=".json,.csv,application/json,text/csv" onchange="imp(event)" hidden></label><button class="btn" onclick="go('log')">🗑 Log de exclusões (${S.log.length})</button><div class="mut">Os dados ficam só na memória desta página: exporte um backup antes de fechar.</div></div><button class="btn ghost" onclick="go('home')">Voltar</button>`;
